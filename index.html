@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -13,8 +14,9 @@
     .btn { background: var(--primary); color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 600; cursor: pointer; }
     .day-card { background: white; margin: 16px auto; max-width: 600px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
     .day-header { background: #f3f4f6; padding: 12px 16px; font-weight: 700; font-size: 1.05rem; border-bottom: 1px solid var(--border); }
-    .today { background: #dbeafe; color: #1e40af; }
+    .today { background: #dbeafe; color: #1e40af; border-left: 4px solid var(--primary); }
     .time-slot { display: flex; height: 52px; border-bottom: 1px dashed var(--border); align-items: center; cursor: pointer; }
+    .time-slot:hover { background: #f3f4f6; }
     .time-label { width: 75px; font-size: 0.85rem; color: #6b7280; text-align: center; border-right: 1px solid var(--border); font-weight: 500; }
     .events-area { flex-grow: 1; padding: 0 10px; display: flex; align-items: center; }
     .event-tag { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; border-radius: 5px; padding: 6px 10px; font-size: 0.9rem; width: 100%; font-weight: 500; }
@@ -30,18 +32,24 @@
 <div id="calendar"></div>
 
 <script>
+  // -------------------------------------------------------------
+  // REPLACE THESE TWO STRINGS WITH YOUR EXACT SUPABASE KEYS:
+  // -------------------------------------------------------------
   // REPLACE THESE WITH YOUR EXACT SUPABASE CREDENTIALS
   const SUPABASE_URL = 'https://bzovempkqdxjuoiwkjva.supabase.co/rest/v1/';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ6b3ZlbXBrcWR4anVvaXdranZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg4MTUzMjcsImV4cCI6MjEwNDM5MTMyN30.YrSpIiuHy8QwLbpwfHQLpMSPu_E854wZwsQOYFDn-KU';
   
   const { createClient } = supabase;
-  const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  let db;
+
+  if (SUPABASE_URL !== 'YOUR_SUPABASE_URL' && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY') {
+    db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  }
 
   const calendar = document.getElementById('calendar');
   let loadedDays = { past: 0, future: 0 };
   let cachedEvents = {};
 
-  // Formats date using local timezone instead of UTC
   function getLocalDateStr(date) {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -49,11 +57,14 @@
     return `${year}-${month}-${day}`;
   }
 
-  // Fetch all saved bookings
   async function fetchEvents() {
+    if (!db) {
+      alert("Database keys missing! Please replace YOUR_SUPABASE_URL and YOUR_SUPABASE_ANON_KEY in index.html.");
+      return;
+    }
     const { data, error } = await db.from('events').select('*');
     if (error) {
-      console.error("Error loading events:", error);
+      alert("Error reading from Supabase: " + error.message);
       return;
     }
     if (data) {
@@ -64,8 +75,9 @@
     }
   }
 
-  // Save or delete booking in Supabase
   async function saveEventToDB(dateStr, hour, title) {
+    if (!db) return alert("Database connection not configured!");
+    
     const key = `${dateStr}_${hour}`;
     if (title && title.trim() !== '') {
       cachedEvents[key] = title.trim();
@@ -73,11 +85,11 @@
         { date_str: dateStr, hour: hour, title: title.trim() },
         { onConflict: 'date_str,hour' }
       );
-      if (error) console.error("Error saving event:", error);
+      if (error) alert("Save failed: " + error.message);
     } else {
       delete cachedEvents[key];
       const { error } = await db.from('events').delete().match({ date_str: dateStr, hour: hour });
-      if (error) console.error("Error deleting event:", error);
+      if (error) alert("Delete failed: " + error.message);
     }
   }
 
@@ -130,14 +142,25 @@
     return card;
   }
 
+  function scrollToToday() {
+    const todayStr = getLocalDateStr(new Date());
+    const todayElement = document.getElementById(`day-${todayStr}`);
+    if (todayElement) {
+      todayElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
+
   async function initApp() {
     await fetchEvents();
     calendar.innerHTML = '';
-    for (let i = -2; i <= 4; i++) {
+    for (let i = -3; i <= 5; i++) {
       calendar.appendChild(createDayCard(i));
     }
-    loadedDays.past = -2;
-    loadedDays.future = 4;
+    loadedDays.past = -3;
+    loadedDays.future = 5;
+
+    // Scroll to today automatically after rendering
+    setTimeout(scrollToToday, 200);
   }
 
   window.addEventListener('scroll', () => {
@@ -152,10 +175,7 @@
     }
   });
 
-  document.getElementById('todayBtn').onclick = () => {
-    const todayStr = getLocalDateStr(new Date());
-    document.getElementById(`day-${todayStr}`)?.scrollIntoView({ behavior: 'smooth' });
-  };
+  document.getElementById('todayBtn').onclick = scrollToToday;
 
   initApp();
 </script>
