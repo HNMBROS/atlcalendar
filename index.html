@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ATL Calendar</title>
+  <style>
+    :root { 
+      --primary: #2563eb; 
+      --border: #e5e7eb; 
+      --bg: #f9fafb; 
+    }
+    body { 
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+      margin: 0; 
+      background: var(--bg); 
+      color: #111827;
+    }
+    header { 
+      position: sticky; 
+      top: 0; 
+      background: white; 
+      padding: 1rem; 
+      border-bottom: 1px solid var(--border); 
+      z-index: 10; 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    header h2 { margin: 0; font-size: 1.25rem; font-weight: 700; color: #1f2937; }
+    .btn {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn:hover { background: #1d4ed8; }
+    .day-card { 
+      background: white; 
+      margin: 16px auto; 
+      max-width: 600px;
+      border: 1px solid var(--border); 
+      border-radius: 8px; 
+      overflow: hidden; 
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    .day-header { 
+      background: #f3f4f6; 
+      padding: 12px 16px; 
+      font-weight: 700; 
+      font-size: 1.05rem; 
+      border-bottom: 1px solid var(--border);
+    }
+    .today { background: #dbeafe; color: #1e40af; }
+    .time-slot { 
+      display: flex; 
+      height: 52px; 
+      border-bottom: 1px dashed var(--border); 
+      align-items: center; 
+      cursor: pointer; 
+      transition: background 0.15s ease;
+    }
+    .time-slot:hover { background: #f9fafb; }
+    .time-label { 
+      width: 75px; 
+      font-size: 0.85rem; 
+      color: #6b7280; 
+      text-align: center; 
+      border-right: 1px solid var(--border); 
+      font-weight: 500;
+    }
+    .events-area { 
+      flex-grow: 1; 
+      padding: 0 10px; 
+      display: flex; 
+      align-items: center; 
+    }
+    .event-tag { 
+      background: #eff6ff; 
+      color: #1d4ed8; 
+      border: 1px solid #bfdbfe; 
+      border-radius: 5px; 
+      padding: 6px 10px; 
+      font-size: 0.9rem; 
+      width: 100%; 
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h2>ATL Calendar</h2>
+  <button class="btn" id="todayBtn">Jump to Today</button>
+</header>
+
+<div id="calendar"></div>
+
+<script>
+  const calendar = document.getElementById('calendar');
+  let loadedDays = { past: 0, future: 0 };
+  const DB_KEY = 'atlcalendar_events_v1';
+
+  // Load saved entries from browser local storage
+  function getEvents() {
+    return JSON.parse(localStorage.getItem(DB_KEY) || '{}');
+  }
+
+  // Save or update an entry in browser local storage
+  function saveEvent(dateStr, hour, title) {
+    const events = getEvents();
+    const key = `${dateStr}_${hour}`;
+    if (title && title.trim() !== '') {
+      events[key] = title.trim();
+    } else {
+      delete events[key];
+    }
+    localStorage.setItem(DB_KEY, JSON.stringify(events));
+  }
+
+  // Generate date cards dynamically
+  function createDayCard(offset) {
+    const d = new Date();
+    d.setDate(d.getDate() + offset);
+    
+    const dateStr = d.toISOString().split('T')[0];
+    const isToday = offset === 0;
+
+    const card = document.createElement('div');
+    card.className = 'day-card';
+    card.id = `day-${dateStr}`;
+
+    const header = document.createElement('div');
+    header.className = `day-header ${isToday ? 'today' : ''}`;
+    
+    const dateTitle = d.toLocaleDateString('en-US', { 
+      weekday: 'short', 
+      month: 'short', 
+      day: 'numeric', 
+      year: 'numeric' 
+    });
+    
+    header.innerText = dateTitle + (isToday ? ' — Today' : '');
+    card.appendChild(header);
+
+    const savedEvents = getEvents();
+
+    // Generate 12 hourly business time slots (8:00 AM to 7:00 PM)
+    for (let hour = 8; hour <= 19; hour++) {
+      const slot = document.createElement('div');
+      slot.className = 'time-slot';
+      
+      const timeLabel = document.createElement('div');
+      timeLabel.className = 'time-label';
+      
+      const displayHour = hour > 12 ? `${hour - 12}:00 PM` : hour === 12 ? '12:00 PM' : `${hour}:00 AM`;
+      timeLabel.innerText = displayHour;
+      
+      const eventsArea = document.createElement('div');
+      eventsArea.className = 'events-area';
+
+      const eventKey = `${dateStr}_${hour}`;
+      if (savedEvents[eventKey]) {
+        eventsArea.innerHTML = `<div class="event-tag">${savedEvents[eventKey]}</div>`;
+      }
+
+      // Click slot to add or modify booking
+      slot.onclick = () => {
+        const current = savedEvents[eventKey] || '';
+        const title = prompt(`Booking for ${dateTitle} at ${displayHour}:`, current);
+        if (title !== null) {
+          saveEvent(dateStr, hour, title);
+          eventsArea.innerHTML = title.trim() ? `<div class="event-tag">${title.trim()}</div>` : '';
+        }
+      };
+
+      slot.appendChild(timeLabel);
+      slot.appendChild(eventsArea);
+      card.appendChild(slot);
+    }
+    return card;
+  }
+
+  // Load initial sequence of days (-2 past days up to +4 future days)
+  for (let i = -2; i <= 4; i++) {
+    calendar.appendChild(createDayCard(i));
+  }
+  loadedDays.past = -2;
+  loadedDays.future = 4;
+
+  // Infinite Scroll Handler
+  window.addEventListener('scroll', () => {
+    // Scroll down -> Load future dates
+    if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 500) {
+      loadedDays.future++;
+      calendar.appendChild(createDayCard(loadedDays.future));
+    }
+    // Scroll up -> Load previous dates seamlessly
+    if (window.scrollY <= 200) {
+      loadedDays.past--;
+      calendar.insertBefore(createDayCard(loadedDays.past), calendar.firstChild);
+      window.scrollBy(0, 300);
+    }
+  });
+
+  // Jump smoothly back to today
+  document.getElementById('todayBtn').onclick = () => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    document.getElementById(`day-${todayStr}`)?.scrollIntoView({ behavior: 'smooth' });
+  };
+</script>
+</body>
+</html>
