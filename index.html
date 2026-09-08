@@ -1,183 +1,480 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ATL Calendar</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <style>
-    :root { --primary: #2563eb; --border: #e5e7eb; --bg: #f9fafb; }
-    body { font-family: system-ui, -apple-system, sans-serif; margin: 0; background: var(--bg); color: #111827; }
-    header { position: sticky; top: 0; background: white; padding: 1rem; border-bottom: 1px solid var(--border); z-index: 10; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-    header h2 { margin: 0; font-size: 1.25rem; font-weight: 700; }
-    .btn { background: var(--primary); color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 600; cursor: pointer; }
-    .day-card { background: white; margin: 16px auto; max-width: 600px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-    .day-header { background: #f3f4f6; padding: 12px 16px; font-weight: 700; font-size: 1.05rem; border-bottom: 1px solid var(--border); }
-    .today { background: #dbeafe; color: #1e40af; border-left: 4px solid var(--primary); }
-    .time-slot { display: flex; height: 52px; border-bottom: 1px dashed var(--border); align-items: center; cursor: pointer; }
-    .time-slot:hover { background: #f3f4f6; }
-    .time-label { width: 75px; font-size: 0.85rem; color: #6b7280; text-align: center; border-right: 1px solid var(--border); font-weight: 500; }
-    .events-area { flex-grow: 1; padding: 0 10px; display: flex; align-items: center; }
-    .event-tag { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; border-radius: 5px; padding: 6px 10px; font-size: 0.9rem; width: 100%; font-weight: 500; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Endless Taxi Feed Calendar</title>
+    <!-- Include Supabase JS SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f3f4f6;
+            margin: 0;
+            padding: 10px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            background: white;
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            width: 100%;
+            max-width: 600px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+        }
+        h2 { margin-top: 0; color: #111827; text-align: center; font-size: 22px; }
+        .paste-zone { background: #f9fafb; border: 2px dashed #2563eb; padding: 12px; border-radius: 8px; margin-bottom: 15px; }
+        .paste-zone label { color: #2563eb; font-weight: bold; display: block; margin-bottom: 6px; font-size: 14px; }
+        .form-group { margin-bottom: 12px; }
+        label { display: block; margin-bottom: 4px; font-weight: 600; color: #374151; font-size: 13px; }
+        input, textarea { width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; box-sizing: border-box; font-size: 16px; background-color: #fff; }
+        textarea { resize: vertical; height: 80px; }
+        input:read-only, textarea:read-only { background-color: #f3f4f6; color: #4b5563; }
+        .btn { width: 100%; padding: 14px; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; background-color: #2563eb; transition: background 0.2s; }
+        .btn:hover { background-color: #1d4ed8; }
+        .btn:disabled { background-color: #9ca3af; cursor: not-allowed; }
+        .search-box { margin: 20px 0 10px 0; background: #fff; border: 1px solid #d1d5db; }
+        .sync-status { text-align: center; font-size: 13px; font-weight: 600; margin-bottom: 10px; color: #059669; }
+        
+        .calendar-feed {
+            height: 550px;
+            overflow-y: auto;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 10px;
+            background: #f9fafb;
+        }
+        
+        .day-bucket { margin-bottom: 15px; }
+        
+        .day-header {
+            background-color: #e5e7eb;
+            padding: 8px 12px;
+            font-weight: 700;
+            color: #1f2937;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            font-size: 14px;
+            border-left: 4px solid #9ca3af;
+        }
+        
+        .day-bucket.today .day-header {
+            background-color: #dbeafe;
+            color: #1e40af;
+            border-left: 4px solid #2563eb;
+        }
+        
+        .no-events-placeholder {
+            font-size: 13px;
+            color: #9ca3af;
+            padding: 6px 12px;
+            font-style: italic;
+        }
+        
+        .event-item {
+            background: #fff;
+            padding: 12px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            margin-bottom: 6px;
+            display: flex;
+            gap: 10px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+        }
+        .time-badge { font-weight: 700; color: #2563eb; font-size: 14px; min-width: 55px; padding-top: 2px; }
+        .event-details { flex: 1; min-width: 0; }
+        .event-title { font-weight: 600; font-size: 14px; margin: 0 0 6px 0; color: #111827; word-wrap: break-word; }
+        .event-desc { font-size: 12px; color: #4b5563; margin: 0; white-space: pre-wrap; background: #f9fafb; padding: 8px; border-radius: 6px; border: 1px solid #f3f4f6; word-wrap: break-word; }
+        .action-btn { background: none; border: none; cursor: pointer; font-size: 12px; padding: 4px; }
+
+        @media (max-width: 480px) {
+            .event-item { flex-direction: column; gap: 5px; }
+            .action-btn { padding: 6px 0; margin-top: 5px; font-size: 13px; text-align: left; }
+        }
+    </style>
 </head>
 <body>
 
-<header>
-  <h2>ATL Calendar</h2>
-  <button class="btn" id="todayBtn">Jump to Today</button>
-</header>
+<div class="container">
+    <h2>Endless Taxi Agenda</h2>
+    <div id="syncStatus" class="sync-status">🔄 Connecting to Supabase...</div>
+    
+    <div class="paste-zone">
+        <label for="rawText">📋 Paste Booking Details Here:</label>
+        <textarea id="rawText" placeholder="Paste text logs here..." oninput="autoParseBooking()"></textarea>
+    </div>
 
-<div id="calendar"></div>
+    <form id="eventForm">
+        <div class="form-group">
+            <label for="title">Generated Route Title</label>
+            <input type="text" id="title" required placeholder="Awaiting paste details..." readonly>
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <div class="form-group" style="flex: 1;">
+                <label for="date">Date</label>
+                <input type="date" id="date" required readonly>
+            </div>
+            <div class="form-group" style="flex: 1;">
+                <label for="time">Time</label>
+                <input type="time" id="time" required readonly>
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="description">Full Saved Log Details</label>
+            <textarea id="description" required placeholder="Awaiting paste details..." readonly></textarea>
+        </div>
+        <button type="submit" id="submitBtn" class="btn" disabled>Syncing database...</button>
+    </form>
+
+    <input type="text" id="searchBar" class="search-box" placeholder="🔍 Search agenda..." oninput="handleSearch()">
+    
+    <div class="calendar-feed" id="calendarFeed" onscroll="checkScroll()"></div>
+</div>
 
 <script>
-  // -------------------------------------------------------------
-  // REPLACE THESE TWO STRINGS WITH YOUR EXACT SUPABASE KEYS:
-  // -------------------------------------------------------------
-  // REPLACE THESE WITH YOUR EXACT SUPABASE CREDENTIALS
-  const SUPABASE_URL = 'https://bzovempkqdxjuoiwkjva.supabase.co/rest/v1/';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ6b3ZlbXBrcWR4anVvaXdranZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg4MTUzMjcsImV4cCI6MjEwNDM5MTMyN30.YrSpIiuHy8QwLbpwfHQLpMSPu_E854wZwsQOYFDn-KU';
+    // 🔑 SUPABASE CONFIGURATION
+    const SUPABASE_URL = 'https://bzovempkqdxjuoiwkjva.supabase.co/rest/v1/';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ6b3ZlbXBrcWR4anVvaXdranZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg4MTUzMjcsImV4cCI6MjEwNDM5MTMyN30.YrSpIiuHy8QwLbpwfHQLpMSPu_E854wZwsQOYFDn-KU';
   
-  const { createClient } = supabase;
-  let db;
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  if (SUPABASE_URL !== 'YOUR_SUPABASE_URL' && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY') {
-    db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  }
-
-  const calendar = document.getElementById('calendar');
-  let loadedDays = { past: 0, future: 0 };
-  let cachedEvents = {};
-
-  function getLocalDateStr(date) {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  }
-
-  async function fetchEvents() {
-    if (!db) {
-      alert("Database keys missing! Please replace YOUR_SUPABASE_URL and YOUR_SUPABASE_ANON_KEY in index.html.");
-      return;
-    }
-    const { data, error } = await db.from('events').select('*');
-    if (error) {
-      alert("Error reading from Supabase: " + error.message);
-      return;
-    }
-    if (data) {
-      cachedEvents = {};
-      data.forEach(item => {
-        cachedEvents[`${item.date_str}_${item.hour}`] = item.title;
-      });
-    }
-  }
-
-  async function saveEventToDB(dateStr, hour, title) {
-    if (!db) return alert("Database connection not configured!");
+    const eventForm = document.getElementById('eventForm');
+    const calendarFeed = document.getElementById('calendarFeed');
+    const syncStatus = document.getElementById('syncStatus');
+    const submitBtn = document.getElementById('submitBtn');
     
-    const key = `${dateStr}_${hour}`;
-    if (title && title.trim() !== '') {
-      cachedEvents[key] = title.trim();
-      const { error } = await db.from('events').upsert(
-        { date_str: dateStr, hour: hour, title: title.trim() },
-        { onConflict: 'date_str,hour' }
-      );
-      if (error) alert("Save failed: " + error.message);
-    } else {
-      delete cachedEvents[key];
-      const { error } = await db.from('events').delete().match({ date_str: dateStr, hour: hour });
-      if (error) alert("Delete failed: " + error.message);
-    }
-  }
+    let events = [];
+    let pastDaysLoaded = 15;
+    let futureDaysLoaded = 45;
+    const airports = ["East Midlands Airport", "Birmingham Airport", "Heathrow Airport", "Gatwick Airport", "Luton Airport", "Stansted Airport", "Manchester Airport"];
 
-  function createDayCard(offset) {
-    const d = new Date();
-    d.setDate(d.getDate() + offset);
-    const dateStr = getLocalDateStr(d);
-    const isToday = offset === 0;
+    // Fetch data from Supabase
+    async function fetchCloudData() {
+        try {
+            const { data, error } = await supabase.from('bookings').select('*');
+            if (error) throw error;
 
-    const card = document.createElement('div');
-    card.className = 'day-card';
-    card.id = `day-${dateStr}`;
-
-    const header = document.createElement('div');
-    header.className = `day-header ${isToday ? 'today' : ''}`;
-    const dateTitle = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-    header.innerText = dateTitle + (isToday ? ' — Today' : '');
-    card.appendChild(header);
-
-    for (let hour = 8; hour <= 19; hour++) {
-      const slot = document.createElement('div');
-      slot.className = 'time-slot';
-      
-      const timeLabel = document.createElement('div');
-      timeLabel.className = 'time-label';
-      const displayHour = hour > 12 ? `${hour - 12}:00 PM` : hour === 12 ? '12:00 PM' : `${hour}:00 AM`;
-      timeLabel.innerText = displayHour;
-      
-      const eventsArea = document.createElement('div');
-      eventsArea.className = 'events-area';
-
-      const eventKey = `${dateStr}_${hour}`;
-      if (cachedEvents[eventKey]) {
-        eventsArea.innerHTML = `<div class="event-tag">${cachedEvents[eventKey]}</div>`;
-      }
-
-      slot.onclick = async () => {
-        const current = cachedEvents[eventKey] || '';
-        const title = prompt(`Booking for ${dateTitle} at ${displayHour}:`, current);
-        if (title !== null) {
-          eventsArea.innerHTML = title.trim() ? `<div class="event-tag">${title.trim()}</div>` : '';
-          await saveEventToDB(dateStr, hour, title);
+            events = data || [];
+            localStorage.setItem('myTaxiBookingsCache', JSON.stringify(events));
+            
+            renderCalendarFeed();
+            if (!document.getElementById('searchBar').value.trim()) {
+                scrollToToday();
+            }
+            syncStatus.innerText = "✅ Supabase Synced";
+            syncStatus.style.color = "#059669";
+            submitBtn.disabled = false;
+            submitBtn.innerText = "Add Booking to Agenda";
+        } catch (err) {
+            console.error(err);
+            syncStatus.innerText = "⚠️ Offline Mode - Showing Cached Jobs";
+            syncStatus.style.color = "#d97706";
+            submitBtn.disabled = false;
+            submitBtn.innerText = "Add Booking to Agenda";
         }
-      };
-
-      slot.appendChild(timeLabel);
-      slot.appendChild(eventsArea);
-      card.appendChild(slot);
     }
-    return card;
-  }
 
-  function scrollToToday() {
-    const todayStr = getLocalDateStr(new Date());
-    const todayElement = document.getElementById(`day-${todayStr}`);
-    if (todayElement) {
-      todayElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    function cleanLocationName(lineText) {
+        if (!lineText) return "";
+        let cleanLine = lineText.replace(/^(Pickup|Dropoff):\s*/i, '').trim();
+        for (let airport of airports) {
+            if (cleanLine.toLowerCase().includes(airport.toLowerCase())) return airport;
+        }
+        let parts = cleanLine.split(',');
+        for (let i = parts.length - 1; i >= 0; i--) {
+            let chunk = parts[i].trim();
+            if (chunk.toLowerCase() === "uk" || /^[A-Z]{1,2}\d/i.test(chunk)) continue;
+            return chunk;
+        }
+        return parts.pop().trim();
     }
-  }
 
-  async function initApp() {
-    await fetchEvents();
-    calendar.innerHTML = '';
-    for (let i = -3; i <= 5; i++) {
-      calendar.appendChild(createDayCard(i));
+    function autoParseBooking() {
+        const text = document.getElementById('rawText').value;
+        if (!text.trim()) return;
+
+        let detectedDate = "";
+        let detectedTime = "";
+        let detectedTitle = "";
+
+        const dateMatch = text.match(/Date\s*&\s*time:\s*(\d{2})\/(\d{2})\/(\d{4})/i);
+        if (dateMatch) detectedDate = `${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}`;
+
+        const timeMatch = text.match(/(\d{2}):(\d{2})/);
+        if (timeMatch) detectedTime = `${timeMatch[1]}:${timeMatch[2]}`;
+
+        const lines = text.split('\n');
+        let pickupLine = "", dropoffLine = "";
+        let vehicleType = "Economy";
+        let paymentStatus = "Unpaid";
+
+        lines.forEach(line => {
+            const lowerLine = line.toLowerCase();
+            if (lowerLine.includes('pickup:')) pickupLine = line;
+            if (lowerLine.includes('dropoff:')) dropoffLine = line;
+            if (lowerLine.includes('vehicle type:')) vehicleType = line.split(':')[1]?.trim() || "Economy";
+            if (lowerLine.includes('payments:')) {
+                let val = line.split(':')[1]?.toLowerCase() || "";
+                if (val.includes('paid')) paymentStatus = "Paid";
+                else if (val.includes('cash') || val.includes('collect')) paymentStatus = "Cash";
+                else paymentStatus = line.split(':')[1]?.trim() || "Unpaid";
+            }
+        });
+
+        const startLoc = cleanLocationName(pickupLine);
+        const endLoc = cleanLocationName(dropoffLine);
+
+        if (startLoc && endLoc) {
+            detectedTitle = `${startLoc} ➡️ ${endLoc} (${vehicleType} - ${paymentStatus})`;
+        }
+
+        if (detectedTitle) document.getElementById('title').value = detectedTitle;
+        if (detectedDate) document.getElementById('date').value = detectedDate;
+        if (detectedTime) document.getElementById('time').value = detectedTime;
+        document.getElementById('description').value = text;
     }
-    loadedDays.past = -3;
-    loadedDays.future = 5;
 
-    // Scroll to today automatically after rendering
-    setTimeout(scrollToToday, 200);
-  }
-
-  window.addEventListener('scroll', () => {
-    if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 500) {
-      loadedDays.future++;
-      calendar.appendChild(createDayCard(loadedDays.future));
+    function getYYYYMMDD(dateObj) {
+        let mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+        let dd = String(dateObj.getDate()).padStart(2, '0');
+        return `${dateObj.getFullYear()}-${mm}-${dd}`;
     }
-    if (window.scrollY <= 200) {
-      loadedDays.past--;
-      calendar.insertBefore(createDayCard(loadedDays.past), calendar.firstChild);
-      window.scrollBy(0, 300);
+
+    function renderCalendarFeed() {
+        calendarFeed.innerHTML = '';
+        const filter = document.getElementById('searchBar').value.toLowerCase();
+        events.sort((a, b) => a.time.localeCompare(b.time));
+
+        let startDate = new Date();
+        startDate.setDate(startDate.getDate() - pastDaysLoaded);
+        
+        let endDate = new Date();
+        endDate.setDate(endDate.getDate() + futureDaysLoaded);
+
+        let todayStr = getYYYYMMDD(new Date());
+
+        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+            let dayStringKey = getYYYYMMDD(d);
+            let dayEvents = events.filter(ev => ev.date === dayStringKey);
+
+            if (filter) {
+                dayEvents = dayEvents.filter(ev => 
+                    ev.title.toLowerCase().includes(filter) || 
+                    (ev.description && ev.description.toLowerCase().includes(filter))
+                );
+                if (dayEvents.length === 0) continue;
+            }
+
+            const dayBucket = document.createElement('div');
+            dayBucket.className = 'day-bucket';
+            if (dayStringKey === todayStr) {
+                dayBucket.className += ' today';
+                dayBucket.id = 'todayLandingNode';
+            }
+
+            const formattedDateHeader = d.toLocaleDateString('en-GB', {
+                weekday: 'long', day: '2-digit', month: 'long', year: 'numeric'
+            });
+
+            let bucketHTML = `<div class="day-header">${formattedDateHeader} ${dayStringKey === todayStr ? '⭐️ (TODAY)' : ''}</div>`;
+
+            if (dayEvents.length === 0) {
+                bucketHTML += `<div class="no-events-placeholder">No jobs scheduled</div>`;
+            } else {
+                dayEvents.forEach((event) => {
+                    if (event.isEditing) {
+                        bucketHTML += `
+                            <div class="event-item" style="border-left: 4px solid #10b981;">
+                                <div class="time-badge">
+                                    <input type="time" id="edit-time-${event.id}" value="${event.time}" style="padding:4px; font-size:12px; width:100%;">
+                                    <input type="date" id="edit-date-${event.id}" value="${event.date}" style="padding:4px; font-size:11px; margin-top:5px; width:100%;">
+                                </div>
+                                <div class="event-details">
+                                    <input type="text" id="edit-title-${event.id}" value="${event.title.replace(/"/g, '&quot;')}" style="font-size:14px; padding:6px; margin-bottom:5px;">
+                                    <textarea id="edit-desc-${event.id}" style="height:80px; font-size:12px; padding:6px;">${event.description || ''}</textarea>
+                                </div>
+                                <div class="action-container" style="display:flex; flex-direction:column; gap:8px;">
+                                    <button class="action-btn save-btn" style="color:#10b981; font-weight:bold;" onclick="saveCloudEdit(${event.id})">Save</button>
+                                    <button class="action-btn" style="color:#9ca3af;" onclick="cancelCloudEdit(${event.id})">Cancel</button>
+                                </div>
+                            </div>`;
+                    } else {
+                        bucketHTML += `
+                            <div class="event-item">
+                                <div class="time-badge">⏰ ${event.time}</div> 
+                                <div class="event-details"> 
+                                    <p class="event-title">${event.title}</p> 
+                                    <p class="event-desc">${event.description || ''}</p> 
+                                </div> 
+                                <div class="action-container" style="display:flex; flex-direction:column; gap:8px;">
+                                    <button class="action-btn edit-btn" style="color:#2563eb;" onclick="startCloudEdit(${event.id})">Edit</button>
+                                    <button class="action-btn delete-btn" style="color:#ef4444;" onclick="deleteCloudEvent(${event.id})">Remove</button>
+                                </div>
+                            </div>`;
+                    }
+                });
+            }
+
+            dayBucket.innerHTML = bucketHTML;
+            calendarFeed.appendChild(dayBucket);
+        }
     }
-  });
 
-  document.getElementById('todayBtn').onclick = scrollToToday;
+    window.startCloudEdit = function(id) {
+        const idx = events.findIndex(ev => ev.id === id);
+        if (idx !== -1) {
+            events[idx].isEditing = true;
+            renderCalendarFeed();
+        }
+    };
 
-  initApp();
+    window.cancelCloudEdit = function(id) {
+        const idx = events.findIndex(ev => ev.id === id);
+        if (idx !== -1) {
+            delete events[idx].isEditing;
+            renderCalendarFeed();
+        }
+    };
+
+    window.saveCloudEdit = async function(id) {
+        const updatedTitle = document.getElementById(`edit-title-${id}`).value;
+        const updatedDesc = document.getElementById(`edit-desc-${id}`).value;
+        const updatedTime = document.getElementById(`edit-time-${id}`).value;
+        const updatedDate = document.getElementById(`edit-date-${id}`).value;
+
+        if (!updatedTitle || !updatedDate || !updatedTime) {
+            return alert("Fields cannot be left blank.");
+        }
+
+        syncStatus.innerText = "⏳ Background Updating Supabase...";
+        syncStatus.style.color = "#d97706";
+
+        try {
+            const { error } = await supabase.from('bookings').update({
+                title: updatedTitle,
+                description: updatedDesc,
+                date: updatedDate,
+                time: updatedTime
+            }).eq('id', id);
+
+            if (error) throw error;
+
+            const idx = events.findIndex(ev => ev.id === id);
+            if (idx !== -1) {
+                events[idx] = { ...events[idx], title: updatedTitle, description: updatedDesc, date: updatedDate, time: updatedTime };
+                delete events[idx].isEditing;
+            }
+
+            localStorage.setItem('myTaxiBookingsCache', JSON.stringify(events));
+            renderCalendarFeed();
+
+            syncStatus.innerText = "✅ Supabase Synced";
+            syncStatus.style.color = "#059669";
+        } catch (err) {
+            console.error(err);
+            syncStatus.innerText = "❌ Save Failed";
+            syncStatus.style.color = "#dc2626";
+        }
+    };
+
+    function checkScroll() {
+        const filter = document.getElementById('searchBar').value.trim();
+        if (filter) return;
+        
+        if (calendarFeed.scrollTop + calendarFeed.clientHeight >= calendarFeed.scrollHeight - 50) {
+            futureDaysLoaded += 30;
+            renderCalendarFeed();
+        }
+        
+        if (calendarFeed.scrollTop <= 5) {
+            const oldHeight = calendarFeed.scrollHeight;
+            pastDaysLoaded += 15;
+            renderCalendarFeed();
+            calendarFeed.scrollTop = calendarFeed.scrollHeight - oldHeight;
+        }
+    }
+
+    function handleSearch() {
+        renderCalendarFeed();
+        if (!document.getElementById('searchBar').value.trim()) {
+            scrollToToday();
+        }
+    }
+
+    function scrollToToday() {
+        const todayNode = document.getElementById('todayLandingNode');
+        if (todayNode) todayNode.scrollIntoView({ block: 'start' });
+    }
+
+    eventForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const newEvent = {
+            title: document.getElementById('title').value,
+            date: document.getElementById('date').value,
+            time: document.getElementById('time').value,
+            description: document.getElementById('description').value
+        };
+
+        syncStatus.innerText = "⏳ Saving to Supabase...";
+        syncStatus.style.color = "#d97706";
+
+        try {
+            const { data, error } = await supabase.from('bookings').insert([newEvent]).select();
+            if (error) throw error;
+
+            if (data && data[0]) {
+                events.push(data[0]);
+                localStorage.setItem('myTaxiBookingsCache', JSON.stringify(events));
+                renderCalendarFeed();
+            }
+
+            eventForm.reset();
+            document.getElementById('rawText').value = '';
+
+            syncStatus.innerText = "✅ Supabase Synced";
+            syncStatus.style.color = "#059669";
+        } catch (err) {
+            console.error(err);
+            syncStatus.innerText = "❌ Failed to save booking";
+            syncStatus.style.color = "#dc2626";
+        }
+    });
+
+    window.deleteCloudEvent = async function(id) {
+        if (!confirm("Are you sure you want to remove this booking?")) return;
+
+        syncStatus.innerText = "⏳ Removing from Supabase...";
+        syncStatus.style.color = "#d97706";
+
+        try {
+            const { error } = await supabase.from('bookings').delete().eq('id', id);
+            if (error) throw error;
+
+            events = events.filter(ev => ev.id !== id);
+            localStorage.setItem('myTaxiBookingsCache', JSON.stringify(events));
+            renderCalendarFeed();
+
+            syncStatus.innerText = "✅ Supabase Synced";
+            syncStatus.style.color = "#059669";
+        } catch (err) {
+            console.error(err);
+            syncStatus.innerText = "❌ Failed to delete item";
+            syncStatus.style.color = "#dc2626";
+        }
+    };
+
+    // Load initial cached data instantly
+    events = JSON.parse(localStorage.getItem('myTaxiBookingsCache')) || [];
+    renderCalendarFeed();
+    setTimeout(scrollToToday, 100);
+
+    // Fetch live data from Supabase
+    fetchCloudData();
 </script>
 </body>
 </html>
+ 
